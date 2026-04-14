@@ -1,15 +1,17 @@
 package com.example.musicplayer.viewmodel
 
 import com.example.musicplayer.repository.MusicRepository
+import com.example.musicplayer.model.Playlist
+import com.example.musicplayer.repository.PlaylistRepository
+import com.example.musicplayer.model.Song
 import kotlinx.coroutines.Job
 import android.app.Application
 import android.content.ComponentName
-import android.os.Debug
 import android.util.Log
+import androidx.media3.common.Player
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.musicplayer.service.MusicService
@@ -20,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * PlayerViewModel
@@ -51,63 +55,52 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Service が別プロセスにあっても動作するように設計されており、
      * play() / pause() / seekTo() などのメソッドが使える。
      */
+
+// ─── 1. Repository ───────────────────────
+    private val playlistRepository = PlaylistRepository(application)
+
+    // ─── 2. MediaController関連 ──────────────
     private var controller: MediaController? = null
-
-    /**
-     * controllerFuture
-     *
-     * MediaController の接続は非同期で行われる（すぐには繋がらない）。
-     * ListenableFuture はその「接続完了を待つ」ための仕組み。
-     * onCleared() で必ず解放する必要がある。
-     */
     private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var pendingMediaItems: List<MediaItem>? = null
 
-    // ─────────────────────────────────────────
-    // UI に公開する状態（StateFlow）
-    // ─────────────────────────────────────────
-
-    /**
-     * StateFlow について
-     *
-     * StateFlow は「常に最新の値を持つストリーム」。
-     * Compose の collectAsState() と組み合わせることで、
-     * 値が変わったときに自動で画面が再描画される。
-     *
-     * MutableStateFlow → ViewModel 内部からのみ書き換え可能
-     * StateFlow        → UI（Composable）からは読み取り専用
-     * この使い分けが重要（外部から勝手に値を書き換えられないようにする）。
-     */
-
-    // 再生中かどうか
+    // ─── 3. 再生状態の StateFlow ─────────────
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    // シャッフルがONかどうか
     private val _isShuffleOn = MutableStateFlow(false)
     val isShuffleOn: StateFlow<Boolean> = _isShuffleOn.asStateFlow()
 
-    /**
-     * リピートモード
-     *
-     * 値は Player の定数を使う：
-     *   Player.REPEAT_MODE_OFF = 0 （リピートなし）
-     *   Player.REPEAT_MODE_ONE = 1 （1曲リピート）
-     *   Player.REPEAT_MODE_ALL = 2 （全曲リピート）
-     */
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
 
-    // 現在の再生位置（ミリ秒）→ シークバーの表示に使う
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
 
-    // 曲の総再生時間（ミリ秒）→ シークバーの最大値に使う
     private val _durationMs = MutableStateFlow(0L)
     val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
-    // 現在再生中の曲情報
     private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
     val currentMediaItem: StateFlow<MediaItem?> = _currentMediaItem.asStateFlow()
+
+    // ─── 4. プレイリスト関連のStateFlow ──────
+    val playlists: StateFlow<List<Playlist>> = playlistRepository
+        .getAllPlaylists()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    private val _playlistSongs = MutableStateFlow<List<Song>>(emptyList())
+    val playlistSongs: StateFlow<List<Song>> = _playlistSongs.asStateFlow()
+
+    private val _isLoadingSongs = MutableStateFlow(false)
+    val isLoadingSongs: StateFlow<Boolean> = _isLoadingSongs.asStateFlow()
+
+    private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
+    val allSongs: StateFlow<List<Song>> = _allSongs.asStateFlow()
+
 
     // ─────────────────────────────────────────
     // Player.Listener（Serviceからの状態変化を受け取る）
@@ -184,8 +177,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * MediaController を通じて MusicService に接続する。
      * 接続は非同期なので、完了したらリスナーを登録して状態を同期する。
      */
-
-    private var pendingMediaItems: List<MediaItem>? = null
 
     private fun connectToService() {
         // SessionToken：「どのServiceのMediaSessionに接続するか」を示す識別子
@@ -380,9 +371,58 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         super.onCleared()
     }
 
+    //プレイリストの関数
+    fun createPlaylist(name: String) {
+        viewModelScope.launch {
+            playlistRepository.createPlaylist(name)
+        }
+    }
+
+    fun deletePlaylist(playlist: Playlist) {
+        viewModelScope.launch {
+            playlistRepository.deletePlaylist(playlist)
+        }
+    }
+
+    fun loadPlaylistSongs(playlistId: Long) {
+        viewModelScope.launch {
+            _isLoadingSongs.value = true
+            _playlistSongs.value = playlistRepository.getSongsInPlaylist(playlistId)
+            _isLoadingSongs.value = false
+        }
+    }
+
+    fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
+        viewModelScope.launch {
+            playlistRepository.addSongsToPlaylist(playlistId, songIds)
+            // 追加後に曲リストを再読み込みして画面を更新する
+            loadPlaylistSongs(playlistId)
+        }
+    }
+
+    fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
+        viewModelScope.launch {
+            playlistRepository.removeSongFromPlaylist(playlistId, songId)
+            loadPlaylistSongs(playlistId)
+        }
+    }
+
+    fun playPlaylist(playlistId: Long, shuffle: Boolean = false, startIndex: Int = 0) {
+        viewModelScope.launch {
+            val songs = playlistRepository.getSongsInPlaylist(playlistId)
+            val mediaItems = with(MusicRepository(getApplication())) { songs.toMediaItems() }
+            if (mediaItems.isNotEmpty()) {
+                controller?.shuffleModeEnabled = shuffle
+                controller?.setMediaItems(mediaItems, startIndex, 0L)
+                controller?.prepare()
+                controller?.play()
+            }
+        }
+    }
+
     // ─────────────────────────────────────────
-// 音楽ファイルの読み込み
-// ─────────────────────────────────────────
+    // 音楽ファイルの読み込み
+    // ─────────────────────────────────────────
 
     /**
      * loadMusicFromStorage()
@@ -398,6 +438,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // 曲リストを取得（suspend 関数なので launch の中で呼べる）
             val songs = repository.getSongs()
+
+            // 全曲リストを保持しておく（AddSongsDialog で使う）
+            _allSongs.value = songs
 
             // Song のリストを MediaItem のリストに変換
             val mediaItems = with(repository) { songs.toMediaItems() }
