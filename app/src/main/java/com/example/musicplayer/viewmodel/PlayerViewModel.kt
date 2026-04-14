@@ -1,8 +1,11 @@
 package com.example.musicplayer.viewmodel
 
 import com.example.musicplayer.repository.MusicRepository
+import kotlinx.coroutines.Job
 import android.app.Application
 import android.content.ComponentName
+import android.os.Debug
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -181,6 +184,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * MediaController を通じて MusicService に接続する。
      * 接続は非同期なので、完了したらリスナーを登録して状態を同期する。
      */
+
+    private var pendingMediaItems: List<MediaItem>? = null
+
     private fun connectToService() {
         // SessionToken：「どのServiceのMediaSessionに接続するか」を示す識別子
         val sessionToken = SessionToken(
@@ -203,6 +209,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // 接続時点での現在状態を StateFlow に反映する（初期値の同期）
                 syncStateFromController()
+
+                // 接続完了後に pending の曲があればここで実行する
+                pendingMediaItems?.let { items ->
+                    controller?.run {
+                        setMediaItems(items)
+                        prepare() // 曲を読み込んでいつでも再生できる状態にする
+                        // play() をここで呼ばないことが重要
+                    }
+                    pendingMediaItems = null
+                }
             },
             // コールバックをメインスレッド（UIスレッド）で実行する指定
             MoreExecutors.directExecutor()
@@ -386,9 +402,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Song のリストを MediaItem のリストに変換
             val mediaItems = with(repository) { songs.toMediaItems() }
 
+            Log.d("PlayerViewModel", "Loaded ${mediaItems.size} songs")
             // プレイリストをセットして再生開始
             if (mediaItems.isNotEmpty()) {
-                setPlaylist(mediaItems)
+                if (controller != null) {
+                    // 既に接続済みならすぐにセット
+                    // 既に接続済みの場合はすぐにプレイリストをセットする
+                    // setPlaylist() の代わりに prepare() どまりの処理を直接書く
+                    // （setPlaylist() の中では play() も呼ばれてしまうため）
+                    controller?.run {
+                        setMediaItems(mediaItems)
+                        prepare()
+                        // play() は呼ばない → 自動再生しない
+                    }
+                } else {
+                    // まだ接続中なら接続完了後に実行されるよう保持しておく
+                    pendingMediaItems = mediaItems
+                }
             }
         }
     }
