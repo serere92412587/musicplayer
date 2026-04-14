@@ -38,19 +38,21 @@ data class PlaylistWithSongIds(
      * このプレイリストに含まれる曲のIDリスト。
      *
      * parentColumn  = playlists テーブルの結合キー（id）
-     * entity        = 取得元のエンティティ（PlaylistSongCrossRef）
-     * entityColumn  = PlaylistSongCrossRef 内で parentColumn と対応するカラム（playlistId）
-     * projection    = 取得したいカラム（songId）
+     * entityColumn  = PlaylistSongCrossRef の曲IDカラム（songId）
+     * associateBy   = 中間テーブル（PlaylistSongCrossRef）を使って結合する
      *
      * Room はこの定義を見て以下のような SQL を自動生成する：
      * SELECT songId FROM playlist_song_cross_ref
-     * WHERE playlistId = [Playlist.id]
+     * WHERE playlistId = [playlist.id]
      */
     @Relation(
         parentColumn = "id",
-        entityColumn = "playlistId",
-        entity = PlaylistSongCrossRef::class,
-        projection = ["songId"]
+        entityColumn = "songId",
+        associateBy = Junction(
+            value = PlaylistSongCrossRef::class,
+            parentColumn = "playlistId",
+            entityColumn = "songId"
+        )
     )
     val songIds: List<Long>
 )
