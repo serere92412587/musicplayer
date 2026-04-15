@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,9 +59,15 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
  *
  * @param viewModel PlayerViewModel のインスタンス。
  *                  画面に表示するデータと操作メソッドを持つ。
+ * @param onNavigateToPlaylist プレイリストボタンが押されたときに呼ばれる関数（追加）
  */
+
+
 @Composable
-fun PlayerScreen(viewModel: PlayerViewModel) {
+fun PlayerScreen(
+    viewModel: PlayerViewModel,
+    onNavigateToPlaylist: () -> Unit // ← これを追加
+) {
 
     // ─────────────────────────────────────────
     // 状態の収集（StateFlow → Compose State への変換）
@@ -99,6 +106,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        //トップエリア
+        TopControlSection(onNavigateToPlaylist = onNavigateToPlaylist)
 
         // ── 曲情報エリア ──────────────────────
         TrackInfoSection(
@@ -128,6 +137,32 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             onShuffleClick = { viewModel.toggleShuffle() },
             onRepeatClick = { viewModel.cycleRepeatMode() }
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 新しく追加する サブ Composable
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * TopControlSection
+ * 画面上部のコントロール。今回は右寄せでプレイリストボタンを配置する。
+ */
+@Composable
+private fun TopControlSection(onNavigateToPlaylist: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End // 右寄せに配置
+    ) {
+        IconButton(onClick = onNavigateToPlaylist) {
+            Icon(
+                // QueueMusic はプレイリストっぽさを出す標準アイコンです
+                imageVector = Icons.Filled.QueueMusic,
+                contentDescription = "プレイリスト一覧へ",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

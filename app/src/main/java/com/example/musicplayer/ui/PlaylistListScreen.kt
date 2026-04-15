@@ -65,7 +65,9 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
 fun PlaylistListScreen(
     viewModel: PlayerViewModel,
     onPlaylistClick: (Long) -> Unit,
-    onSettingsClick: (Long) -> Unit
+    onSettingsClick: (Long) -> Unit,
+    onNavigateToDetail: (Long) -> Unit,
+    onBack: () -> Unit
 ) {
     // ─────────────────────────────────────────
     // 状態の収集

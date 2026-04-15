@@ -40,7 +40,7 @@ import com.example.musicplayer.model.PlaylistSongCrossRef
         Playlist::class,             // playlists テーブル
         PlaylistSongCrossRef::class  // playlist_song_cross_ref テーブル
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -25,6 +25,10 @@ import androidx.core.content.ContextCompat
 import com.example.musicplayer.ui.PlayerScreen
 import com.example.musicplayer.ui.theme.MusicplayerTheme
 import com.example.musicplayer.viewmodel.PlayerViewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.musicplayer.ui.PlaylistListScreen
 
 /**
  * MainActivity
@@ -80,6 +84,7 @@ class MainActivity : ComponentActivity() {
         // isGranted: true → 許可された、false → 拒否された
         if (isGranted) {
             // 許可されたので音楽ファイルを読み込む
+            Log.d("MainActivity", "許可された")
             loadMusicFiles()
         }
         // 拒否された場合はダイアログで説明する（後述の UI 側で処理）
@@ -150,9 +155,49 @@ class MainActivity : ComponentActivity() {
                             // これを指定しないとコンテンツがシステムバーの下に隠れる
                             .padding(innerPadding)
                     ) {
-                        // メインの再生画面を表示する
-                        // ViewModel を渡すことで、画面が状態を監視・操作できる
-                        PlayerScreen(viewModel = viewModel)
+                        // 画面遷移を管理するコントローラーを生成
+                        val navController = rememberNavController()
+
+                        // NavHost で「どの文字（ルート）の時にどの画面を出すか」を決める
+                        NavHost(
+                            navController = navController,
+                            startDestination = "player_screen" // 最初はプレーヤー画面
+                        ){
+
+                            // ① プレーヤー画面
+                            composable("player_screen") {
+                                // メインの再生画面を表示する
+                                // ViewModel を渡すことで、画面が状態を監視・操作できる
+                                PlayerScreen(
+                                    viewModel = viewModel,
+                                    onNavigateToPlaylist = {
+                                        // ボタンが押されたらプレイリスト一覧へ移動！
+                                        navController.navigate("playlist_list_screen")
+                                    }
+                                )
+                            }
+
+                            // ② プレイリスト一覧画面
+                            composable("playlist_list_screen") {
+                                PlaylistListScreen(
+                                    viewModel = viewModel,
+                                    onNavigateToDetail = { playlistId ->
+                                        // 詳細画面へ移動（まだ作ってない場合は後回しでOK）
+                                        // navController.navigate("playlist_detail/$playlistId")
+                                    },
+                                    onBack = {
+                                        // 戻るボタンが押されたら前の画面に戻る
+                                        navController.popBackStack()
+                                    },
+                                    onPlaylistClick = { playlistId ->
+                                        //空
+                                    },
+                                    onSettingsClick = { playlistId ->
+                                        //空
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
