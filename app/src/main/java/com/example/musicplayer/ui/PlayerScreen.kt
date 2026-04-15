@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -66,7 +67,8 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
-    onNavigateToPlaylist: () -> Unit // ← これを追加
+    onNavigateToPlaylist: () -> Unit, // ← これを追加
+    onNavigateToAllSongs: () -> Unit
 ) {
 
     // ─────────────────────────────────────────
@@ -107,7 +109,10 @@ fun PlayerScreen(
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         //トップエリア
-        TopControlSection(onNavigateToPlaylist = onNavigateToPlaylist)
+        TopControlSection(
+            onNavigateToPlaylist = onNavigateToPlaylist,
+            onNavigateToAllSongs = onNavigateToAllSongs
+        )
 
         // ── 曲情報エリア ──────────────────────
         TrackInfoSection(
@@ -149,11 +154,25 @@ fun PlayerScreen(
  * 画面上部のコントロール。今回は右寄せでプレイリストボタンを配置する。
  */
 @Composable
-private fun TopControlSection(onNavigateToPlaylist: () -> Unit) {
+private fun TopControlSection(
+    onNavigateToPlaylist: () -> Unit,
+    onNavigateToAllSongs: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End // 右寄せに配置
+        horizontalArrangement = Arrangement.SpaceBetween //両端にボタンを置くためにSpaceBetweenにする
     ) {
+        // 左側：全曲一覧ボタン（アイコンは LibraryMusic などお好みで）
+        IconButton(onClick = onNavigateToAllSongs) {
+            Icon(
+                imageVector = Icons.Filled.LibraryMusic, // 要インポート
+                contentDescription = "すべての曲",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        //右側:プレイリスト一覧ボタン
         IconButton(onClick = onNavigateToPlaylist) {
             Icon(
                 // QueueMusic はプレイリストっぽさを出す標準アイコンです

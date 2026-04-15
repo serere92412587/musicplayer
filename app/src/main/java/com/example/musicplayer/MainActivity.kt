@@ -28,7 +28,9 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.musicplayer.ui.AllSongsScreen
 import com.example.musicplayer.ui.PlaylistListScreen
+import com.example.musicplayer.ui.PlaylistSettingScreen
 
 /**
  * MainActivity
@@ -173,6 +175,10 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToPlaylist = {
                                         // ボタンが押されたらプレイリスト一覧へ移動！
                                         navController.navigate("playlist_list_screen")
+                                    },
+                                    onNavigateToAllSongs = {
+                                        // 全曲一覧ボタンが押されたら全曲一覧へ移動
+                                        navController.navigate("all_songs_screen")
                                     }
                                 )
                             }
@@ -193,8 +199,31 @@ class MainActivity : ComponentActivity() {
                                         //空
                                     },
                                     onSettingsClick = { playlistId ->
-                                        //空
+                                        navController.navigate("playlist_setting/$playlistId")
                                     }
+                                )
+                            }
+
+                            // ③ プレイリスト設定画面（今回追加する部分！）
+                            composable("playlist_setting/{playlistId}") { backStackEntry ->
+                                // URLから playlistId を Long 型として取り出す
+                                val playlistIdStr = backStackEntry.arguments?.getString("playlistId")
+                                val playlistId = playlistIdStr?.toLongOrNull()
+
+                                if (playlistId != null) {
+                                    PlaylistSettingScreen(
+                                        playlistId = playlistId,
+                                        viewModel = viewModel,
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+
+                            // ④ 全曲一覧画面
+                            composable("all_songs_screen") {
+                                AllSongsScreen(
+                                    viewModel = viewModel,
+                                    onBack = { navController.popBackStack() }
                                 )
                             }
                         }

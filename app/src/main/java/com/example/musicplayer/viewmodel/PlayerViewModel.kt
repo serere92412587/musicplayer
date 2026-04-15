@@ -4,7 +4,6 @@ import com.example.musicplayer.repository.MusicRepository
 import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.repository.PlaylistRepository
 import com.example.musicplayer.model.Song
-import kotlinx.coroutines.Job
 import android.app.Application
 import android.content.ComponentName
 import android.util.Log
@@ -14,9 +13,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.example.musicplayer.db.AppDatabase
 import com.example.musicplayer.service.MusicService
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +58,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
 
 // ─── 1. Repository ───────────────────────
-    private val playlistRepository = PlaylistRepository(application)
+    private val playlistRepository = PlaylistRepository(
+        application,
+        AppDatabase.getInstance(getApplication()).playlistDao()
+    )
 
     // ─── 2. MediaController関連 ──────────────
     private var controller: MediaController? = null
@@ -98,6 +102,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isLoadingSongs = MutableStateFlow(false)
     val isLoadingSongs: StateFlow<Boolean> = _isLoadingSongs.asStateFlow()
 
+    // 端末内のすべての曲を保持するリスト
     private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs.asStateFlow()
 
@@ -420,6 +425,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * プレイリストの更新（タイマー設定の変更などに使う）
+     */
+    fun updatePlaylist(playlist: Playlist) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // ※ repository に updatePlaylist がある前提です
+            val repository = PlaylistRepository(getApplication(), AppDatabase.getInstance(getApplication()).playlistDao())
+            repository.updatePlaylist(playlist)
+        }
+    }
+
     // ─────────────────────────────────────────
     // 音楽ファイルの読み込み
     // ─────────────────────────────────────────
@@ -448,21 +464,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             Log.d("PlayerViewModel", "Loaded ${mediaItems.size} songs")
             // プレイリストをセットして再生開始
             if (mediaItems.isNotEmpty()) {
-                if (controller != null) {
-                    // 既に接続済みならすぐにセット
-                    // 既に接続済みの場合はすぐにプレイリストをセットする
-                    // setPlaylist() の代わりに prepare() どまりの処理を直接書く
-                    // （setPlaylist() の中では play() も呼ばれてしまうため）
-                    controller?.run {
-                        setMediaItems(mediaItems)
-                        prepare()
-                        // play() は呼ばない → 自動再生しない
-                    }
-                } else {
-                    // まだ接続中なら接続完了後に実行されるよう保持しておく
-                    pendingMediaItems = mediaItems
-                }
+                // 起動直後の自動再生を防ぐため、setPlaylistではなく直接セットしてprepareだけにする
+                controller?.setMediaItems(mediaItems, 0, 0L)
+                controller?.prepare()
             }
+        }
+    }
+
+    // ── ③ 新しいメソッドを追加 ──
+    /**
+     * 全曲リストの中から、指定した曲を再生する
+     */
+    fun playSongFromLibrary(songId: Long) {
+        val songs = _allSongs.value
+        // タップされた曲が、リストの何番目にあるかを探す
+        val index = songs.indexOfFirst { it.id == songId }
+
+        if (index != -1) {
+            val repository = MusicRepository(getApplication())
+            val mediaItems = with(repository) { songs.toMediaItems() }
+            // そのインデックスから再生を開始する（これで「次の曲」もそのまま機能する）
+            setPlaylist(mediaItems, startIndex = index)
         }
     }
 }

@@ -5,9 +5,9 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import com.example.musicplayer.db.AppDatabase
+import com.example.musicplayer.db.PlaylistDao
 import com.example.musicplayer.model.Playlist
 import com.example.musicplayer.model.PlaylistSongCrossRef
-import com.example.musicplayer.model.PlaylistWithSongIds
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.model.TimerConfig
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
  * @param context アプリのコンテキスト。
  *                DBの取得と MediaStore へのアクセスに使う。
  */
-class PlaylistRepository(private val context: Context) {
+class PlaylistRepository(private val context: Context, playlistDao: PlaylistDao) {
 
     /**
      * dao

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -260,13 +261,25 @@ private fun PlaylistItem(
                 )
             }
 
-            // 右側：削除ボタン
-            IconButton(onClick = onDeleteClick) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "削除",
-                    tint = MaterialTheme.colorScheme.error
-                )
+            // ── 修正ポイント：右側にボタンを2つ並べる ──
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 設定（歯車）ボタン
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "設定",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 削除（ゴミ箱）ボタン
+                IconButton(onClick = onDeleteClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "削除",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }
