@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.musicplayer.model.Song
 import com.example.musicplayer.viewmodel.PlayerViewModel
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.FilterChip
 import org.checkerframework.checker.units.qual.UnknownUnits
@@ -28,8 +29,9 @@ fun PlaylistDetailScreen(
     playlistId: Long,
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
-    onPlay: () -> Unit //再生時のコールバック
-) {
+    onPlay: () -> Unit, //再生時のコールバック
+    onAddSongsClick: () -> Unit
+    ) {
     // 画面が開かれたときに、このプレイリストの曲を読み込む
     LaunchedEffect(playlistId) {
         viewModel.loadPlaylistSongs(playlistId)
@@ -44,8 +46,6 @@ fun PlaylistDetailScreen(
     // 全曲リスト（追加ダイアログ用）
     val allSongs: List<Song> by viewModel.allSongs.collectAsStateWithLifecycle()
 
-    var showAddDialog by remember { mutableStateOf(false) }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,8 +58,11 @@ fun PlaylistDetailScreen(
             )
         },
         floatingActionButton = {
-            // 曲追加ボタン
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = {
+                // 💡 ダイアログを出す代わりに、フォルダ選択画面へ Go!
+                viewModel.clearSelectionForAdd(playlistSongs.map { it.id }.toSet())
+                onAddSongsClick()
+            }) {
                 Icon(imageVector = Icons.Filled.Add, contentDescription = "曲を追加")
             }
         }
@@ -93,20 +96,6 @@ fun PlaylistDetailScreen(
             }
         }
     }
-
-    // ── 曲追加ダイアログ ──
-    if (showAddDialog) {
-        AddSongsDialog(
-            allSongs = allSongs,
-            // 既に追加されている曲は最初からチェックを入れておく
-            initialSelectedSongIds = playlistSongs.map { it.id }.toSet(),
-            onConfirm = { selectedIds ->
-                viewModel.addSongsToPlaylist(playlistId, selectedIds.toList())
-                showAddDialog = false
-            },
-            onDismiss = { showAddDialog = false }
-        )
-    }
 }
 
 /**
@@ -132,102 +121,4 @@ private fun PlaylistSongItem(song: Song, onClick: () -> Unit, onRemoveClick: () 
             Icon(imageVector = Icons.Filled.Delete, contentDescription = "プレイリストから外す", tint = MaterialTheme.colorScheme.error)
         }
     }
-}
-
-/**
- * 複数曲を選択できるダイアログ（フォルダ絞り込み機能付き）
- */
-@Composable
-private fun AddSongsDialog(
-    allSongs: List<Song>,
-    initialSelectedSongIds: Set<Long>,
-    onConfirm: (Set<Long>) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedIds by remember { mutableStateOf(initialSelectedSongIds) }
-
-    // 💡 フォルダ選択用の状態を追加
-    var selectedFolder by remember { mutableStateOf("すべて") }
-
-    // 💡 フォルダのリストを作成（"すべて" を先頭に）
-    val availableFolders = remember(allSongs) {
-        listOf("すべて") + allSongs.map { it.folderName }.distinct().sorted()
-    }
-
-    // 💡 選択したフォルダで曲を絞り込み
-    val displayedSongs = remember(allSongs, selectedFolder) {
-        if (selectedFolder == "すべて") {
-            allSongs
-        } else {
-            allSongs.filter { it.folderName == selectedFolder }
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("曲を追加") },
-        text = {
-            Column {
-                // ── ① フォルダ選択タブ（横スクロール） ──
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(availableFolders) { folder ->
-                        FilterChip(
-                            selected = (folder == selectedFolder),
-                            onClick = { selectedFolder = folder },
-                            label = { Text(folder) }
-                        )
-                    }
-                }
-
-                // ── ② 曲リスト ──
-                LazyColumn(
-                    // 💡 weight(1f, fill=false) を指定し、曲が多くてもダイアログが画面外にはみ出さないようにする
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
-                ) {
-                    items(displayedSongs, key = { it.id }) { song ->
-                        val isSelected = selectedIds.contains(song.id)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    // チェックのON/OFFを切り替え
-                                    selectedIds = if (isSelected) {
-                                        selectedIds - song.id
-                                    } else {
-                                        selectedIds + song.id
-                                    }
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isSelected,
-                                onCheckedChange = null // 行全体のクリックで制御
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = song.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(selectedIds) }) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("キャンセル")
-            }
-        }
-    )
 }

@@ -537,4 +537,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // UIから呼び出す更新メソッド
     fun updateSortType(type: SortType) { _sortType.value = type }
     fun updateSelectedFolder(folder: String) { _selectedFolder.value = folder }
+
+    // プレイリスト追加用に選択された曲IDのセット
+    private val _selectedIdsForAdd = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIdsForAdd = _selectedIdsForAdd.asStateFlow()
+
+    /**
+     * 選択状態の切り替え（チェックボックス用）
+     */
+    fun toggleSongSelectionForAdd(songId: Long) {
+        val current = _selectedIdsForAdd.value
+        _selectedIdsForAdd.value = if (current.contains(songId)) {
+            current - songId
+        } else {
+            current + songId
+        }
+    }
+
+    /**
+     * 選択状態をリセットする
+     */
+    fun clearSelectionForAdd(initialIds: Set<Long> = emptySet()) {
+        _selectedIdsForAdd.value = initialIds
+    }
 }
