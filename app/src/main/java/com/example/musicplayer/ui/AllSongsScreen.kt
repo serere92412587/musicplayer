@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,11 +34,10 @@ fun AllSongsScreen(
     // ViewModel から全曲のリストを受け取る
     // allSongs の代わりに、加工済みの displayedSongs を使う
     val displayedSongs by viewModel.displayedSongs.collectAsStateWithLifecycle()
-    val availableFolders by viewModel.availableFolders.collectAsStateWithLifecycle()
     // 💡 選択中のフォルダ名を取得（タイトルに使うため）
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
+    // ソートの状態
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
-
 
     // ソートメニューの開閉状態
     var showSortMenu by remember { mutableStateOf(false) }
@@ -47,8 +47,41 @@ fun AllSongsScreen(
             TopAppBar(
                 // 💡 タイトルを「すべての曲」から「選択したフォルダ名」に変更
                 title = { Text(selectedFolder) },
-                navigationIcon = { /* ... 既存の戻るボタン ... */ },
-                actions = { /* ... 既存のソートメニュー ... */ }
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "戻る"
+                        )
+                    }
+                },
+                actions = {
+                    // 💡 ② 全く同じソートメニューを配置！
+                    Box {
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(imageVector = Icons.Filled.Sort, contentDescription = "並び替え")
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            SortType.entries.forEach { type ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = type.displayName,
+                                            color = if (sortType == type) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        viewModel.updateSortType(type)
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             )
         }
     ) { innerPadding ->

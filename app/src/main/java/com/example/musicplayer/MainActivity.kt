@@ -28,6 +28,7 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.musicplayer.ui.AddSongsListScreen
 import com.example.musicplayer.ui.AllSongsScreen
 import com.example.musicplayer.ui.FolderListScreen
 import com.example.musicplayer.ui.PlaylistListScreen
@@ -274,7 +275,42 @@ class MainActivity : ComponentActivity() {
                                         onPlay = {
                                             // player_screen まで一気に履歴を戻して（popBackStack）、その画面を表示する
                                             navController.popBackStack("player_screen", inclusive = false)
+                                        },
+                                        onAddSongsClick = {
+                                            Log.d("MainActivity", "navigate to add song folder")
+                                            navController.navigate("add_songs_folder/$playlistId")
                                         }
+                                    )
+                                }
+                            }
+
+                            // 🆕 プレイリスト追加用のフォルダ選択
+                            composable("add_songs_folder/{playlistId}") { backStackEntry ->
+                                val playlistId = backStackEntry.arguments?.getString("playlistId")?.toLongOrNull()
+                                if (playlistId != null) {
+                                    FolderListScreen(
+                                        viewModel = viewModel,
+                                        onFolderClick = { folderName ->
+                                            viewModel.updateSelectedFolder(folderName)
+                                            navController.navigate("add_songs_list/$playlistId")
+                                        },
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+
+                            // 🆕 プレイリスト追加用の曲一覧（複数選択）
+                            composable("add_songs_list/{playlistId}") { backStackEntry ->
+                                val playlistId = backStackEntry.arguments?.getString("playlistId")?.toLongOrNull()
+                                if (playlistId != null) {
+                                    AddSongsListScreen(
+                                        playlistId = playlistId,
+                                        viewModel = viewModel,
+                                        onSave = {
+                                            // 保存したら、詳細画面まで一気に戻る
+                                            navController.popBackStack("playlist_detail/$playlistId", inclusive = false)
+                                        },
+                                        onBack = { navController.popBackStack() }
                                     )
                                 }
                             }
