@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,9 +60,16 @@ import com.example.musicplayer.viewmodel.PlayerViewModel
  *
  * @param viewModel PlayerViewModel のインスタンス。
  *                  画面に表示するデータと操作メソッドを持つ。
+ * @param onNavigateToPlaylist プレイリストボタンが押されたときに呼ばれる関数（追加）
  */
+
+
 @Composable
-fun PlayerScreen(viewModel: PlayerViewModel) {
+fun PlayerScreen(
+    viewModel: PlayerViewModel,
+    onNavigateToPlaylist: () -> Unit, // ← これを追加
+    onNavigateToAllSongs: () -> Unit
+) {
 
     // ─────────────────────────────────────────
     // 状態の収集（StateFlow → Compose State への変換）
@@ -99,6 +108,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        //トップエリア
+        TopControlSection(
+            onNavigateToPlaylist = onNavigateToPlaylist,
+            onNavigateToAllSongs = onNavigateToAllSongs
+        )
 
         // ── 曲情報エリア ──────────────────────
         TrackInfoSection(
@@ -128,6 +142,46 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             onShuffleClick = { viewModel.toggleShuffle() },
             onRepeatClick = { viewModel.cycleRepeatMode() }
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 新しく追加する サブ Composable
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * TopControlSection
+ * 画面上部のコントロール。今回は右寄せでプレイリストボタンを配置する。
+ */
+@Composable
+private fun TopControlSection(
+    onNavigateToPlaylist: () -> Unit,
+    onNavigateToAllSongs: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween //両端にボタンを置くためにSpaceBetweenにする
+    ) {
+        // 左側：全曲一覧ボタン（アイコンは LibraryMusic などお好みで）
+        IconButton(onClick = onNavigateToAllSongs) {
+            Icon(
+                imageVector = Icons.Filled.LibraryMusic, // 要インポート
+                contentDescription = "すべての曲",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        //右側:プレイリスト一覧ボタン
+        IconButton(onClick = onNavigateToPlaylist) {
+            Icon(
+                // QueueMusic はプレイリストっぽさを出す標準アイコンです
+                imageVector = Icons.Filled.QueueMusic,
+                contentDescription = "プレイリスト一覧へ",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
