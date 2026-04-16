@@ -15,6 +15,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.musicplayer.db.AppDatabase
 import com.example.musicplayer.service.MusicService
+import com.example.musicplayer.timer.SleepTimerManager
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
@@ -115,6 +116,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // 端末内のすべての曲を保持するリスト
     private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs.asStateFlow()
+
+    // 🆕 スリープタイマーを管理するクラス（viewModelScope を渡して初期化）
+    private val sleepTimerManager = SleepTimerManager(viewModelScope)
 
 
     // ─────────────────────────────────────────
@@ -438,6 +442,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             controller?.shuffleModeEnabled = shuffle
             // 💡 ExoPlayerを直接操作せず、単曲再生でも使っている setPlaylist に任せる
             setPlaylist(mediaItems, startIndex)
+        }
+
+        // 💡 ── ここからタイマー処理を追加 ──
+        viewModelScope.launch {
+            // プレイリスト本体の情報をDBから取得して、タイマー設定を確認
+            val playlistInfo = playlistRepository.getPlaylistWithTimerConfig(playlistId)
+
+            if (playlistInfo != null && playlistInfo.timerConfig.enabled && controller != null) {
+                // タイマーONなら、SleepTimerManager に指示を出す！
+                sleepTimerManager.startTimer(
+                    player = controller!!,
+                    durationMin = playlistInfo.timerConfig.durationMin,
+                    fadeOutSec = playlistInfo.timerConfig.fadeOutSec
+                )
+            } else {
+                // タイマーOFF（または別のプレイリスト再生時）はタイマーをリセット
+                sleepTimerManager.cancelTimer(controller)
+            }
         }
     }
 
