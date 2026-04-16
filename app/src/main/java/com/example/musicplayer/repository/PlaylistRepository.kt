@@ -30,29 +30,16 @@ import kotlinx.coroutines.withContext
  * @param context アプリのコンテキスト。
  *                DBの取得と MediaStore へのアクセスに使う。
  */
-class PlaylistRepository(private val context: Context, playlistDao: PlaylistDao) {
+// 💡 コンストラクタの引数に "private val" をつけて、名前を "dao" に変更します
+class PlaylistRepository(private val context: Context, private val dao: PlaylistDao) {
 
-    /**
-     * dao
-     *
-     * AppDatabase のシングルトンインスタンスから DAO を取得する。
-     * Repository が生成されるたびに同じDBインスタンスが使われる。
-     */
-    private val dao = AppDatabase.getInstance(context).playlistDao()
+    // ❌ 以下の2行は不要になるので削除します！
+    // val playlistDao: Any
+    // private val dao = AppDatabase.getInstance(context).playlistDao()
 
     // ─────────────────────────────────────────
     // プレイリストの CRUD
     // ─────────────────────────────────────────
-
-    /**
-     * getAllPlaylists()
-     *
-     * 全プレイリストを Flow で返す。
-     * DBが更新されるたびに自動で最新のリストが流れてくる。
-     *
-     * ViewModel でこの Flow を collect することで、
-     * プレイリストを追加・削除したら即座に一覧画面が更新される。
-     */
     fun getAllPlaylists(): Flow<List<Playlist>> {
         return dao.getAllPlaylists()
     }

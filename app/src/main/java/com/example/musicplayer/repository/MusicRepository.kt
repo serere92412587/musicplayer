@@ -77,6 +77,7 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.DURATION,      // 再生時間（ミリ秒）
             MediaStore.Audio.Media.ALBUM_ID,      // アルバムアートの取得に使うID
             MediaStore.Audio.Media.DATE_ADDED,    // 追加日時（ソートに使う）
+            MediaStore.Audio.Media.DATA           // ファイルの場所
         )
 
         /**
@@ -129,6 +130,8 @@ class MusicRepository(private val context: Context) {
             val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            // パスを取得するためのカラム
+            val dataColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
 
             // Cursor を1行ずつ読み進める
             while (cursor.moveToNext()) {
@@ -163,6 +166,11 @@ class MusicRepository(private val context: Context) {
                     albumId
                 )
 
+                // ファイルのフルパス（例: /storage/emulated/0/Music/healing/song1.mp3）を取得
+                val path = cursor.getString(dataColumn)
+                // パスから親フォルダの名前（例: healing）だけを抽出
+                val folderName = java.io.File(path).parentFile?.name ?: "Unknown"
+
                 // Song データクラスに詰めてリストに追加
                 songs.add(
                     Song(
@@ -172,7 +180,8 @@ class MusicRepository(private val context: Context) {
                         album = album,
                         duration = duration,
                         contentUri = contentUri,
-                        albumArtUri = albumArtUri
+                        albumArtUri = albumArtUri,
+                        folderName = folderName
                     )
                 )
             }

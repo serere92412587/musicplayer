@@ -25,6 +25,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+
+// ── ソートの種類を定義 ──
+enum class SortType(val displayName: String) {
+    TITLE_ASC("名前順 (A-Z)"),
+    TITLE_DESC("名前順 (Z-A)"),
+    ARTIST_ASC("アーティスト順")
+}
 
 /**
  * PlayerViewModel
@@ -97,7 +107,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
 
     private val _playlistSongs = MutableStateFlow<List<Song>>(emptyList())
-    val playlistSongs: StateFlow<List<Song>> = _playlistSongs.asStateFlow()
+    val playlistSongs = _playlistSongs.asStateFlow()
 
     private val _isLoadingSongs = MutableStateFlow(false)
     val isLoadingSongs: StateFlow<Boolean> = _isLoadingSongs.asStateFlow()
@@ -390,38 +400,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun loadPlaylistSongs(playlistId: Long) {
-        viewModelScope.launch {
-            _isLoadingSongs.value = true
-            _playlistSongs.value = playlistRepository.getSongsInPlaylist(playlistId)
-            _isLoadingSongs.value = false
+        viewModelScope.launch(Dispatchers.IO) {
+            // 💡 すでに上部で作られている playlistRepository をそのまま使う！
+            val songs = playlistRepository.getSongsInPlaylist(playlistId)
+            _playlistSongs.value = songs
         }
     }
 
     fun addSongsToPlaylist(playlistId: Long, songIds: List<Long>) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            // 💡 ここも既存の playlistRepository を使う
             playlistRepository.addSongsToPlaylist(playlistId, songIds)
-            // 追加後に曲リストを再読み込みして画面を更新する
+            // 保存したらリストを再読み込みして画面を更新
             loadPlaylistSongs(playlistId)
         }
     }
 
     fun removeSongFromPlaylist(playlistId: Long, songId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            // 💡 daoを直接触らず、Repositoryに作ってあるメソッドを素直に呼ぶ
             playlistRepository.removeSongFromPlaylist(playlistId, songId)
             loadPlaylistSongs(playlistId)
         }
     }
 
     fun playPlaylist(playlistId: Long, shuffle: Boolean = false, startIndex: Int = 0) {
-        viewModelScope.launch {
-            val songs = playlistRepository.getSongsInPlaylist(playlistId)
-            val mediaItems = with(MusicRepository(getApplication())) { songs.toMediaItems() }
-            if (mediaItems.isNotEmpty()) {
-                controller?.shuffleModeEnabled = shuffle
-                controller?.setMediaItems(mediaItems, startIndex, 0L)
-                controller?.prepare()
-                controller?.play()
-            }
+        // 💡 修正ポイント：DBから再取得せず、すでにUIに表示されているリストをそのまま使う
+        val songs = _playlistSongs.value
+
+        // 念のため、空なら何もしない
+        if (songs.isEmpty()) return
+
+        val repository = MusicRepository(getApplication())
+        val mediaItems = with(repository) { songs.toMediaItems() }
+
+        if (mediaItems.isNotEmpty()) {
+            controller?.shuffleModeEnabled = shuffle
+            // 💡 ExoPlayerを直接操作せず、単曲再生でも使っている setPlaylist に任せる
+            setPlaylist(mediaItems, startIndex)
         }
     }
 
@@ -487,4 +503,38 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             setPlaylist(mediaItems, startIndex = index)
         }
     }
+
+    //ソート機能
+
+    // ── 新しく追加する状態管理 ──
+    private val _sortType = MutableStateFlow(SortType.TITLE_ASC)
+    val sortType = _sortType.asStateFlow()
+
+    private val _selectedFolder = MutableStateFlow("すべて")
+    val selectedFolder = _selectedFolder.asStateFlow()
+
+    // 自動で全曲からフォルダ名のリストを抽出（["すべて", "home", "healing" ...]）
+    val availableFolders = _allSongs.map { songs ->
+        listOf("すべて") + songs.map { it.folderName }.distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.Lazily, listOf("すべて"))
+
+    /**
+     * 実際にUIに渡す「加工済みの曲リスト」
+     * allSongs, selectedFolder, sortType のどれかが変わるたびに自動で再計算される
+     */
+    val displayedSongs = combine(_allSongs, _selectedFolder, _sortType) { songs, folder, sort ->
+        // 1. フォルダで絞り込み
+        val filtered = if (folder == "すべて") songs else songs.filter { it.folderName == folder }
+
+        // 2. ソートを適用
+        when (sort) {
+            SortType.TITLE_ASC -> filtered.sortedBy { it.title }
+            SortType.TITLE_DESC -> filtered.sortedByDescending { it.title }
+            SortType.ARTIST_ASC -> filtered.sortedBy { it.artist }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // UIから呼び出す更新メソッド
+    fun updateSortType(type: SortType) { _sortType.value = type }
+    fun updateSelectedFolder(folder: String) { _selectedFolder.value = folder }
 }

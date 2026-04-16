@@ -29,8 +29,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.musicplayer.ui.AllSongsScreen
+import com.example.musicplayer.ui.FolderListScreen
 import com.example.musicplayer.ui.PlaylistListScreen
 import com.example.musicplayer.ui.PlaylistSettingScreen
+import com.example.musicplayer.ui.PlaylistDetailScreen
 
 /**
  * MainActivity
@@ -108,6 +110,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // ─ パーミッションの確認と要求 ─
+        checkAndRequestPermission(
+            onDenied = {
+                // 拒否されたらダイアログを表示する
+                // ただし setContent {} の外からは直接 State を変更できないため、
+                // ViewModel 経由で管理するか、Activity のフィールドで管理する方法もある
+                // 今回はシンプルに Activity 側でパーミッション処理を完結させる
+            }
+        )
+
         // Compose の UI をセットアップする
         setContent {
 
@@ -177,8 +189,8 @@ class MainActivity : ComponentActivity() {
                                         navController.navigate("playlist_list_screen")
                                     },
                                     onNavigateToAllSongs = {
-                                        // 全曲一覧ボタンが押されたら全曲一覧へ移動
-                                        navController.navigate("all_songs_screen")
+                                        // 💡 変更：全曲一覧ではなく「フォルダ選択画面」へ移動する！
+                                        navController.navigate("folder_list_screen")
                                     }
                                 )
                             }
@@ -188,15 +200,15 @@ class MainActivity : ComponentActivity() {
                                 PlaylistListScreen(
                                     viewModel = viewModel,
                                     onNavigateToDetail = { playlistId ->
-                                        // 詳細画面へ移動（まだ作ってない場合は後回しでOK）
-                                        // navController.navigate("playlist_detail/$playlistId")
+                                        //詳細画面へ移動
+                                        navController.navigate("playlist_detail/$playlistId")
                                     },
                                     onBack = {
                                         // 戻るボタンが押されたら前の画面に戻る
                                         navController.popBackStack()
                                     },
                                     onPlaylistClick = { playlistId ->
-                                        //空
+                                        navController.navigate("playlist_detail/$playlistId")
                                     },
                                     onSettingsClick = { playlistId ->
                                         navController.navigate("playlist_setting/$playlistId")
@@ -204,7 +216,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // ③ プレイリスト設定画面（今回追加する部分！）
+                            // ③ プレイリスト設定画面（曲追加画面）
                             composable("playlist_setting/{playlistId}") { backStackEntry ->
                                 // URLから playlistId を Long 型として取り出す
                                 val playlistIdStr = backStackEntry.arguments?.getString("playlistId")
@@ -219,28 +231,58 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // ④ 全曲一覧画面
+                            // 🆕 新しく追加：フォルダ選択画面
+                            composable("folder_list_screen") {
+                                FolderListScreen(
+                                    viewModel = viewModel,
+                                    onFolderClick = { folderName ->
+                                        // フォルダが選ばれたら ViewModel に記憶させて...
+                                        viewModel.updateSelectedFolder(folderName)
+                                        // 曲一覧画面へ進む！
+                                        navController.navigate("all_songs_screen")
+                                    },
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
+
+                            // ④ 曲一覧画面（元・全曲一覧画面）
                             composable("all_songs_screen") {
                                 AllSongsScreen(
                                     viewModel = viewModel,
-                                    onBack = { navController.popBackStack() }
+                                    onBack = {
+                                        /**
+                                        // 戻るボタンが押されたら、一つ前（フォルダ選択画面）に戻る
+                                        navController.popBackStack()
+                                        */
+                                        // player_screen まで一気に履歴を戻して（popBackStack）、その画面を表示する
+                                        navController.popBackStack("player_screen", inclusive = false)
+                                    }
                                 )
+                            }
+
+                            // 🆕 新しく追加：プレイリスト詳細画面（曲追加画面）
+                            composable("playlist_detail/{playlistId}") { backStackEntry ->
+                                // URLから playlistId を Long 型として取り出す
+                                val playlistIdStr = backStackEntry.arguments?.getString("playlistId")
+                                val playlistId = playlistIdStr?.toLongOrNull()
+
+                                if (playlistId != null) {
+                                    PlaylistDetailScreen(
+                                        playlistId = playlistId,
+                                        viewModel = viewModel,
+                                        onBack = { navController.popBackStack() },
+                                        onPlay = {
+                                            // player_screen まで一気に履歴を戻して（popBackStack）、その画面を表示する
+                                            navController.popBackStack("player_screen", inclusive = false)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-
-        // ─ パーミッションの確認と要求 ─
-        checkAndRequestPermission(
-            onDenied = {
-                // 拒否されたらダイアログを表示する
-                // ただし setContent {} の外からは直接 State を変更できないため、
-                // ViewModel 経由で管理するか、Activity のフィールドで管理する方法もある
-                // 今回はシンプルに Activity 側でパーミッション処理を完結させる
-            }
-        )
     }
 
     // ─────────────────────────────────────────
