@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,7 +88,6 @@ class MainActivity : ComponentActivity() {
         // isGranted: true → 許可された、false → 拒否された
         if (isGranted) {
             // 許可されたので音楽ファイルを読み込む
-            Log.d("MainActivity", "許可された")
             loadMusicFiles()
         }
         // 拒否された場合はダイアログで説明する（後述の UI 側で処理）
@@ -277,7 +275,6 @@ class MainActivity : ComponentActivity() {
                                             navController.popBackStack("player_screen", inclusive = false)
                                         },
                                         onAddSongsClick = {
-                                            Log.d("MainActivity", "navigate to add song folder")
                                             navController.navigate("add_songs_folder/$playlistId")
                                         }
                                     )
@@ -341,11 +338,9 @@ class MainActivity : ComponentActivity() {
 
         // Android バージョンに応じて必要なパーミッションを選択する
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Log.d("MainActivity", "13以降")
             // Android 13（API 33）以降
             Manifest.permission.READ_MEDIA_AUDIO
         } else {
-            Log.d("MainActivity", "12以下")
             // Android 12（API 32）以下
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
@@ -355,13 +350,11 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, permission) ==
                     PackageManager.PERMISSION_GRANTED -> {
                 // すぐに音楽ファイルを読み込む
-                Log.d("MainActivity", "許可済み")
                 loadMusicFiles()
             }
 
             // ケース2：パーミッションが未許可 → ユーザーに要求する
             else -> {
-                Log.d("MainActivity", "未許可")
                 permissionLauncher.launch(permission)
             }
         }
@@ -379,6 +372,5 @@ class MainActivity : ComponentActivity() {
      */
     private fun loadMusicFiles() {
         viewModel.loadMusicFromStorage()
-        Log.d("MainActivity", "loadMusicFiles")
     }
 }

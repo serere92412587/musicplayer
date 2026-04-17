@@ -6,7 +6,6 @@ import com.example.musicplayer.repository.PlaylistRepository
 import com.example.musicplayer.model.Song
 import android.app.Application
 import android.content.ComponentName
-import android.util.Log
 import androidx.media3.common.Player
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -498,8 +497,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Song のリストを MediaItem のリストに変換
             val mediaItems = with(repository) { songs.toMediaItems() }
-
-            Log.d("PlayerViewModel", "Loaded ${mediaItems.size} songs")
             // プレイリストをセットして再生開始
             if (mediaItems.isNotEmpty()) {
                 // 起動直後の自動再生を防ぐため、setPlaylistではなく直接セットしてprepareだけにする
