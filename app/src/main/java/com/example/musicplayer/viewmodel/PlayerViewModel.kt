@@ -533,25 +533,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val selectedFolder = _selectedFolder.asStateFlow()
 
     // 自動で全曲からフォルダ名のリストを抽出（["すべて", "home", "healing" ...]）
-    val availableFolders = _allSongs.map { songs ->
-        listOf("すべて") + songs.map { it.folderName }.distinct().sorted()
-    }.stateIn(viewModelScope, SharingStarted.Lazily, listOf("すべて"))
-
-    /**
-     * 実際にUIに渡す「加工済みの曲リスト」
-     * allSongs, selectedFolder, sortType のどれかが変わるたびに自動で再計算される
-     */
-    val displayedSongs = combine(_allSongs, _selectedFolder, _sortType) { songs, folder, sort ->
-        // 1. フォルダで絞り込み
-        val filtered = if (folder == "すべて") songs else songs.filter { it.folderName == folder }
-
-        // 2. ソートを適用
-        when (sort) {
-            SortType.TITLE_ASC -> filtered.sortedBy { it.title }
-            SortType.TITLE_DESC -> filtered.sortedByDescending { it.title }
-            SortType.ARTIST_ASC -> filtered.sortedBy { it.artist }
-        }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     // UIから呼び出す更新メソッド
     fun updateSortType(type: SortType) { _sortType.value = type }
@@ -579,4 +560,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun clearSelectionForAdd(initialIds: Set<Long> = emptySet()) {
         _selectedIdsForAdd.value = initialIds
     }
+
+    // 💡 ① 検索ワードを保持する状態を追加！
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
+
+    val availableFolders = _allSongs.map { songs ->
+        listOf("すべて") + songs.map { it.folderName }.distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.Lazily, listOf("すべて"))
+
+    /**
+     * 実際にUIに渡す「加工済みの曲リスト」
+     * allSongs, selectedFolder, sortType, そして searchQuery のどれかが変わるたびに自動で再計算される
+     */
+    // 💡 ② combine に _searchQuery を追加して、4つの状態を合成する！
+    val displayedSongs = combine(
+        _allSongs,
+        _selectedFolder,
+        _sortType,
+        _searchQuery
+    ) { songs, folder, sort, query ->
+
+        // 1. フォルダで絞り込み
+        val folderFiltered = if (folder == "すべて") songs else songs.filter { it.folderName == folder }
+
+        // 💡 2. 検索ワードで絞り込み（新しく追加）
+        val searchFiltered = if (query.isBlank()) {
+            folderFiltered // 検索欄が空ならそのまま
+        } else {
+            folderFiltered.filter {
+                // タイトルかアーティスト名に検索ワードが含まれていれば残す
+                // ignoreCase = true で、大文字・小文字（Ado と ado など）を区別せずに検索できます
+                it.title.contains(query, ignoreCase = true) ||
+                        it.artist.contains(query, ignoreCase = true)
+            }
+        }
+
+        // 3. 最後にソートを適用（folderFiltered を searchFiltered に変更）
+        when (sort) {
+            SortType.TITLE_ASC -> searchFiltered.sortedBy { it.title }
+            SortType.TITLE_DESC -> searchFiltered.sortedByDescending { it.title }
+            SortType.ARTIST_ASC -> searchFiltered.sortedBy { it.artist }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // 💡 ③ UIから検索ワードを更新するためのメソッドを追加
+    fun updateSearchQuery(query: String) { _searchQuery.value = query }
 }

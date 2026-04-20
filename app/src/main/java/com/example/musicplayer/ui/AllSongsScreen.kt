@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.musicplayer.model.Song
+import com.example.musicplayer.ui.components.SongSearchBar
 import com.example.musicplayer.viewmodel.PlayerViewModel
 import com.example.musicplayer.viewmodel.SortType
 
@@ -38,6 +39,8 @@ fun AllSongsScreen(
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
     // ソートの状態
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
+    // 💡 ① ViewModel から検索ワードの状態を取得する
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     // ソートメニューの開閉状態
     var showSortMenu by remember { mutableStateOf(false) }
@@ -108,6 +111,14 @@ fun AllSongsScreen(
                 }
             }
              */
+
+            // 💡 ② リストの直上に検索バーを配置！
+            SongSearchBar(
+                query = searchQuery,
+                onQueryChange = { newQuery ->
+                    viewModel.updateSearchQuery(newQuery)
+                }
+            )
 
             // ── 曲リスト ──
             LazyColumn(modifier = Modifier.weight(1f)) {
