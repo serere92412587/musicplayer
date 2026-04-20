@@ -37,6 +37,7 @@ import com.example.musicplayer.viewmodel.SortType
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.example.musicplayer.ui.components.SongSearchBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,9 @@ fun AddSongsListScreen(
     val displayedSongs by viewModel.displayedSongs.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIdsForAdd.collectAsStateWithLifecycle()
     val selectedFolder by viewModel.selectedFolder.collectAsStateWithLifecycle()
+
+    // 💡 ViewModel から検索ワードの状態を取得する
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     // 💡 ① ソートメニューの状態を取得
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
@@ -103,21 +107,35 @@ fun AddSongsListScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            items(displayedSongs, key = { it.id }) { song ->
-                val isSelected = selectedIds.contains(song.id)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.toggleSongSelectionForAdd(song.id) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(checked = isSelected, onCheckedChange = null)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(text = song.title, style = MaterialTheme.typography.titleMedium)
-                        Text(text = song.artist, style = MaterialTheme.typography.bodySmall)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // 💡 ② リストの直上に検索バーを配置！
+            SongSearchBar(
+                query = searchQuery,
+                onQueryChange = { newQuery ->
+                    viewModel.updateSearchQuery(newQuery)
+                }
+            )
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(displayedSongs, key = { it.id }) { song ->
+                    val isSelected = selectedIds.contains(song.id)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.toggleSongSelectionForAdd(song.id) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = isSelected, onCheckedChange = null)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(text = song.title, style = MaterialTheme.typography.titleMedium)
+                            Text(text = song.artist, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
