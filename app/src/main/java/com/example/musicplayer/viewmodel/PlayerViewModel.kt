@@ -17,6 +17,7 @@ import com.example.musicplayer.service.MusicService
 import com.example.musicplayer.timer.SleepTimerManager
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import kotlin.math.pow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -159,8 +160,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
          * 再生中の曲が変わったときに呼ばれる（曲送り・曲戻し）
          */
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // 既存のコード（これはそのまま残します）
             _currentMediaItem.value = mediaItem
             _durationMs.value = controller?.duration?.coerceAtLeast(0L) ?: 0L
+
+            // 💡 ここから下を追加！：ReplayGainによる自動音量調整
+            if (mediaItem == null) return
+
+            // 1. 今再生されようとしている曲のIDを取得
+            val songId = mediaItem.mediaId.toLongOrNull() ?: return
+
+            // 2. _allSongs の中から、該当する曲のデータを探す
+            val currentSong = _allSongs.value.find { it.id == songId }
+
+            if (currentSong != null) {
+                // 3. ゲイン値(dB)を音量(0.0~1.0)に変換
+                val targetVolume = convertDbToVolume(currentSong.replayGain)
+
+                // 4. プレーヤーの音量を自動調節！
+                controller?.volume = targetVolume
+
+                Log.d("PlayerViewModel", "▶️ ${currentSong.title} を再生します。自動音量調整: ${currentSong.replayGain}dB -> Volume $targetVolume")
+            }
         }
 
         /**
@@ -606,4 +627,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // 💡 ③ UIから検索ワードを更新するためのメソッドを追加
     fun updateSearchQuery(query: String) { _searchQuery.value = query }
+
+    // PlayerViewModel.kt の下の方に追加
+    /**
+     * デシベル(dB)をExoPlayer用の音量(0.0 ~ 1.0)に変換する関数
+     */
+    private fun convertDbToVolume(db: Float): Float {
+        // 10の (db/20) 乗 を計算
+        val volume = 10f.pow(db / 20f)
+        // 音量が大きすぎると割れるので、最大1.0、最小0.0に制限する
+        return volume.coerceIn(0f, 1.0f)
+    }
 }

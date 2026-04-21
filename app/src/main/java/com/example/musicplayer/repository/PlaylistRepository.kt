@@ -244,7 +244,9 @@ class PlaylistRepository(private val context: Context, private val dao: Playlist
                         ),
                         albumArtUri = ContentUris.withAppendedId(
                             Uri.parse("content://media/external/audio/albumart"), albumId
-                        )
+                        ),
+                        folderName = "Unknown",
+                        replayGain = 0f
                     )
                 )
             }
