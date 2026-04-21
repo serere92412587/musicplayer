@@ -9,6 +9,10 @@ import androidx.media3.common.MediaMetadata
 import com.example.musicplayer.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import java.io.File
+import android.util.Log
 
 /**
  * MusicRepository
@@ -131,7 +135,8 @@ class MusicRepository(private val context: Context) {
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             // パスを取得するためのカラム
-            val dataColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
+            val dataColumn =
+                cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
 
             // Cursor を1行ずつ読み進める
             while (cursor.moveToNext()) {
@@ -142,6 +147,27 @@ class MusicRepository(private val context: Context) {
                 val album = cursor.getString(albumColumn) ?: "不明なアルバム"
                 val duration = cursor.getLong(durationColumn)
                 val albumId = cursor.getLong(albumIdColumn)
+                // 例: MusicRepository.kt の Cursor で曲を読み込んでいるループの中など
+                val dataPath = cursor.getString(dataColumn)
+
+                // 💡 ① 先ほど成功したタグ読み取り処理を実行（※少し時間がかかります）
+                var gainValue = 0f
+                try {
+                    val file = File(dataPath)
+                    val audioFile = AudioFileIO.read(file)
+                    val tag = audioFile.tag
+                    if (tag != null) {
+                        val gainStr = tag.getFirst("REPLAYGAIN_TRACK_GAIN").takeIf { it.isNotEmpty() }
+                            ?: tag.getFirst("replaygain_track_gain").takeIf { it.isNotEmpty() }
+                            ?: tag.getFirst("TXXX:REPLAYGAIN_TRACK_GAIN").takeIf { it.isNotEmpty() }
+                            ?: tag.getFirst("----:com.apple.iTunes:replaygain_track_gain").takeIf { it.isNotEmpty() }
+
+                        val match = Regex("([-+]?[0-9]*\\.?[0-9]+)").find(gainStr ?: "")
+                        gainValue = match?.value?.toFloatOrNull() ?: 0f
+                    }
+                } catch (e: Exception) {
+                    // 読み取れなかった場合はデフォルトの0fのままにする
+                }
 
                 /**
                  * 音楽ファイルの URI を生成する
@@ -181,7 +207,8 @@ class MusicRepository(private val context: Context) {
                         duration = duration,
                         contentUri = contentUri,
                         albumArtUri = albumArtUri,
-                        folderName = folderName
+                        folderName = folderName,
+                        replayGain = gainValue
                     )
                 )
             }
@@ -219,6 +246,63 @@ class MusicRepository(private val context: Context) {
                         .build()
                 )
                 .build()
+        }
+    }
+
+    /**
+     * 実験用：ファイルパスからReplayGainを読み取る（＋全タグ解析機能付き）
+     */
+    fun testReadReplayGain(filePath: String): Float? {
+        return try {
+            val file = File(filePath)
+            val audioFile = AudioFileIO.read(file)
+            val tag = audioFile.tag
+
+            if (tag == null) {
+                Log.d("ReplayGainTest", "タグが存在しません: ${file.name}")
+                return null
+            }
+
+            // 💡 ① m4aやmp3で使われる様々なキーの候補をリスト化して順番に探す
+            val possibleKeys = listOf(
+                "REPLAYGAIN_TRACK_GAIN",
+                "replaygain_track_gain",
+                "TXXX:REPLAYGAIN_TRACK_GAIN",
+                "----:com.apple.iTunes:replaygain_track_gain" // m4aの定番
+            )
+
+            var gainStr: String? = null
+            for (key in possibleKeys) {
+                val value = tag.getFirst(key)
+                if (!value.isNullOrEmpty()) {
+                    gainStr = value
+                    Log.d("ReplayGainTest", "🔍 キー [$key] で発見！生データ: $value")
+                    break
+                }
+            }
+
+            // 💡 ② それでも見つからなかった場合、ファイル内の全タグをログに書き出す！
+            if (gainStr.isNullOrEmpty()) {
+                Log.d("ReplayGainTest", "=== ⚠️ ${file.name} のタグ一覧を解析します ===")
+                val fields = tag.fields
+                while (fields.hasNext()) {
+                    val field = fields.next()
+                    // ここに表示された名前（field.id）が、本当のキー名です
+                    Log.d("ReplayGainTest", "タグID: ${field.id} = ${field.toString()}")
+                }
+                Log.d("ReplayGainTest", "===============================================")
+                null
+            } else {
+                // 💡 ③ "Text=-10.00 dB" のように余計な文字が混ざっていても、数字だけを抜き出す正規表現
+                val match = Regex("([-+]?[0-9]*\\.?[0-9]+)").find(gainStr)
+                val gainValue = match?.value?.toFloatOrNull()
+
+                Log.d("ReplayGainTest", "🎉 成功！ ${file.name} の最終ゲイン値: $gainValue")
+                gainValue
+            }
+        } catch (e: Exception) {
+            Log.e("ReplayGainTest", "エラー: ${e.message}")
+            null
         }
     }
 }

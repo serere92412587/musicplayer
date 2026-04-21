@@ -31,5 +31,6 @@ data class Song(
     val duration: Long,
     val contentUri: Uri,
     val albumArtUri: Uri,
-    val folderName: String = "Unknown"
+    val folderName: String,
+    val replayGain: Float = 0f
 )
