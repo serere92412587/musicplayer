@@ -179,8 +179,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // 4. プレーヤーの音量を自動調節！
                 controller?.volume = targetVolume
-
-                Log.d("PlayerViewModel", "▶️ ${currentSong.title} を再生します。自動音量調整: ${currentSong.replayGain}dB -> Volume $targetVolume")
             }
         }
 
