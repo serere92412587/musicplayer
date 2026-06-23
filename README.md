@@ -32,12 +32,12 @@ git clone https://github.com/serere92412587/musicplayer.git
 
 ## UIのスクリーンショット
 ### プレーヤー画面
-<img width="650" height="1440" alt="image" src="https://github.com/user-attachments/assets/be797ed9-367b-4d88-9e97-f43a3daababf" />
+<img width="400" height="700" alt="image" src="https://github.com/user-attachments/assets/be797ed9-367b-4d88-9e97-f43a3daababf" />
 
 ### プレイリスト管理・表示画面
-<img width="415" height="924" alt="image" src="https://github.com/user-attachments/assets/dbc67a6c-2fe1-4c47-a8b2-542e3234fa97" />
+<img width="400" height="700" alt="image" src="https://github.com/user-attachments/assets/dbc67a6c-2fe1-4c47-a8b2-542e3234fa97" />
 
 ### 曲追加・選択画面
-<img width="418" height="930" alt="image" src="https://github.com/user-attachments/assets/4442a777-5361-43b2-9c23-686f1e0318f7" />
+<img width="400" height="700" alt="image" src="https://github.com/user-attachments/assets/4442a777-5361-43b2-9c23-686f1e0318f7" />
 
 
