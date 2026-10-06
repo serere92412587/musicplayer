@@ -12,13 +12,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.media3.common.MediaItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -90,6 +95,7 @@ fun PlayerScreen(
     val currentPositionMs by viewModel.currentPositionMs.collectAsStateWithLifecycle()
     val durationMs by viewModel.durationMs.collectAsStateWithLifecycle()
     val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
+    val nextMediaItem by viewModel.nextMediaItem.collectAsStateWithLifecycle()
 
     // ─────────────────────────────────────────
     // レイアウト
@@ -135,6 +141,12 @@ fun PlayerScreen(
             onSkipPrevious = { viewModel.skipToPrevious() }
         )
 
+        // ── 次に再生される曲エリア ───────────
+        NextTrackSection(
+            nextMediaItem = nextMediaItem,
+            onNextClick = { viewModel.skipToNext() }
+        )
+
         // ── シャッフル・リピートエリア ────────
         ShuffleRepeatSection(
             isShuffleOn = isShuffleOn,
@@ -176,7 +188,7 @@ private fun TopControlSection(
         IconButton(onClick = onNavigateToPlaylist) {
             Icon(
                 // QueueMusic はプレイリストっぽさを出す標準アイコンです
-                imageVector = Icons.Filled.QueueMusic,
+                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                 contentDescription = "プレイリスト一覧へ",
                 modifier = Modifier.size(32.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -350,6 +362,54 @@ private fun PlaybackControlsSection(
 }
 
 /**
+ * NextTrackSection
+ *
+ * 次に再生される曲の情報をコントロールボタン下に小さく表示するセクション。
+ * タップすると次の曲へスキップできる。
+ */
+@Composable
+private fun NextTrackSection(
+    nextMediaItem: MediaItem?,
+    onNextClick: () -> Unit
+) {
+    val title = nextMediaItem?.mediaMetadata?.title?.toString()
+    val artist = nextMediaItem?.mediaMetadata?.artist?.toString()
+
+    if (!title.isNullOrBlank()) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier
+                .clickable { onNextClick() }
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = "次に再生される曲",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Up Next: $title${if (!artist.isNullOrBlank()) " • $artist" else ""}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    } else {
+        // 次に再生される曲がない場合（プレイリスト末尾など）
+        Spacer(modifier = Modifier.height(28.dp))
+    }
+}
+
+/**
  * ShuffleRepeatSection
  *
  * シャッフルボタンとリピートボタンを横並びに配置するセクション。
@@ -391,33 +451,25 @@ private fun ShuffleRepeatSection(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            IconButton(onClick = onShuffleClick) {
-                Icon(
-                    imageVector = Icons.Filled.Shuffle,
-                    contentDescription = "シャッフル",
-                    tint = shuffleColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            // ボタンの下にラベルを表示
-            Text(
-                text = if (isShuffleOn) "シャッフルON" else "シャッフル",
-                style = MaterialTheme.typography.labelSmall,
-                color = shuffleColor
+        IconButton(onClick = onShuffleClick) {
+            Icon(
+                imageVector = Icons.Filled.Shuffle,
+                contentDescription = if (isShuffleOn) "シャッフルON" else "シャッフルOFF",
+                tint = shuffleColor,
+                modifier = Modifier.size(28.dp)
             )
         }
 
         // ── リピートボタン ────────────────────
 
         /**
-         * リピートモードに応じてアイコンと色とラベルを切り替える
+         * リピートモードに応じてアイコンと色を切り替える
          *
-         * REPEAT_MODE_OFF → グレー・Repeatアイコン・「リピートなし」
-         * REPEAT_MODE_ONE → プライマリカラー・RepeatOneアイコン・「1曲リピート」
-         * REPEAT_MODE_ALL → プライマリカラー・Repeatアイコン・「全曲リピート」
+         * REPEAT_MODE_OFF → グレー・Repeatアイコン
+         * REPEAT_MODE_ONE → プライマリカラー・RepeatOneアイコン
+         * REPEAT_MODE_ALL → プライマリカラー・Repeatアイコン
          */
-        val (repeatIcon, repeatColor, repeatLabel) = when (repeatMode) {
+        val (repeatIcon, repeatColor, contentDesc) = when (repeatMode) {
             Player.REPEAT_MODE_ONE -> Triple(
                 Icons.Filled.RepeatOne,
                 MaterialTheme.colorScheme.primary,
@@ -435,19 +487,12 @@ private fun ShuffleRepeatSection(
             )
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            IconButton(onClick = onRepeatClick) {
-                Icon(
-                    imageVector = repeatIcon,
-                    contentDescription = "リピート切り替え",
-                    tint = repeatColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Text(
-                text = repeatLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = repeatColor
+        IconButton(onClick = onRepeatClick) {
+            Icon(
+                imageVector = repeatIcon,
+                contentDescription = contentDesc,
+                tint = repeatColor,
+                modifier = Modifier.size(28.dp)
             )
         }
     }

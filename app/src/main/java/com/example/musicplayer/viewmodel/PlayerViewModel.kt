@@ -6,6 +6,8 @@ import com.example.musicplayer.repository.PlaylistRepository
 import com.example.musicplayer.model.Song
 import android.app.Application
 import android.content.ComponentName
+import androidx.media3.common.C
+import androidx.media3.common.Timeline
 import androidx.media3.common.Player
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,7 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.map
 
 // ── ソートの種類を定義 ──
@@ -98,6 +99,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
     val currentMediaItem: StateFlow<MediaItem?> = _currentMediaItem.asStateFlow()
 
+    // 🆕 次に再生される曲の StateFlow
+    private val _nextMediaItem = MutableStateFlow<MediaItem?>(null)
+    val nextMediaItem: StateFlow<MediaItem?> = _nextMediaItem.asStateFlow()
+
     // ─── 4. プレイリスト関連のStateFlow ──────
     val playlists: StateFlow<List<Playlist>> = playlistRepository
         .getAllPlaylists()
@@ -146,6 +151,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _isPlaying.value = controller?.isPlaying ?: false
             // 曲の長さが確定するのも STATE_READY のタイミングなので、ここで取得
             _durationMs.value = controller?.duration?.coerceAtLeast(0L) ?: 0L
+            updateNextMediaItem()
         }
 
         /**
@@ -154,6 +160,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
          */
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _isPlaying.value = isPlaying
+            updateNextMediaItem()
+        }
+
+        /**
+         * タイムライン（プレイリストやキューの構造）が変わったときに呼ばれる
+         */
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            updateNextMediaItem()
         }
 
         /**
@@ -163,6 +177,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // 既存のコード（これはそのまま残します）
             _currentMediaItem.value = mediaItem
             _durationMs.value = controller?.duration?.coerceAtLeast(0L) ?: 0L
+            updateNextMediaItem()
 
             // 💡 ここから下を追加！：ReplayGainによる自動音量調整
             if (mediaItem == null) return
@@ -187,6 +202,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
          */
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
             _isShuffleOn.value = shuffleModeEnabled
+            updateNextMediaItem()
         }
 
         /**
@@ -194,6 +210,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
          */
         override fun onRepeatModeChanged(repeatMode: Int) {
             _repeatMode.value = repeatMode
+            updateNextMediaItem()
         }
     }
 
@@ -266,6 +283,42 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _repeatMode.value = c.repeatMode
             _currentMediaItem.value = c.currentMediaItem
             _durationMs.value = c.duration.coerceAtLeast(0L)
+            updateNextMediaItem()
+        }
+    }
+
+    /**
+     * updateNextMediaItem()
+     *
+     * 現在のタイムライン・シャッフル・リピート状態を考慮して、
+     * 次に再生される予定の曲（MediaItem）を算出して StateFlow に反映する。
+     */
+    private fun updateNextMediaItem() {
+        val c = controller ?: run {
+            _nextMediaItem.value = null
+            return
+        }
+        val timeline = c.currentTimeline
+        if (timeline.isEmpty) {
+            _nextMediaItem.value = null
+            return
+        }
+        val currentIndex = c.currentMediaItemIndex
+        if (currentIndex == C.INDEX_UNSET || currentIndex < 0) {
+            _nextMediaItem.value = null
+            return
+        }
+
+        val nextIndex = timeline.getNextWindowIndex(
+            currentIndex,
+            c.repeatMode,
+            c.shuffleModeEnabled
+        )
+
+        if (nextIndex != C.INDEX_UNSET && nextIndex >= 0 && nextIndex < c.mediaItemCount) {
+            _nextMediaItem.value = c.getMediaItemAt(nextIndex)
+        } else {
+            _nextMediaItem.value = null
         }
     }
 
@@ -308,6 +361,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             setMediaItems(items, startIndex, 0L)
             prepare()
             play()
+            updateNextMediaItem()
         }
     }
 
@@ -364,6 +418,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // リスナーの onShuffleModeEnabledChanged() が呼ばれて StateFlow も更新されるが、
         // 即時反映のためにここでも更新しておく
         _isShuffleOn.value = newValue
+        updateNextMediaItem()
     }
 
     /**
@@ -386,6 +441,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         controller?.repeatMode = nextMode
         _repeatMode.value = nextMode
+        updateNextMediaItem()
     }
 
     // ─────────────────────────────────────────
